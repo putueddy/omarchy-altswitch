@@ -1,20 +1,28 @@
-# Alt-tab switcher
+# Alt-tab switcher (macOS-style)
 
-Windows-style `ALT`+`TAB` for [Omarchy](https://omarchy.org/). Cycles every
-window on every workspace, ordered by most recently used.
+A macOS-style `ALT`+`TAB` switcher for [Omarchy](https://omarchy.org/). Cycles
+every window on every workspace, ordered by most recently used, and shows a
+horizontal bar of window icons with the selected window's title beneath it.
 
-Hold `ALT`, tap `TAB` to move down the list, release `ALT` to jump to the
+Hold `ALT`, tap `TAB` to move along the bar, release `ALT` to jump to the
 highlighted window.
 
 ![Preview](preview.png)
+
+> **This is a fork.** It is based on Pablo Merino's
+> [omarchy-altswitch](https://github.com/Pablo-Merino/omarchy-altswitch) 1.0.0
+> (MIT). The key handling, state machine, and IPC are unchanged; this fork
+> replaces the list-card appearance with an icon bar and adds a configurable
+> icon override. See [NOTICE](NOTICE) and [CHANGELOG](CHANGELOG.md). Not
+> affiliated with or endorsed by the original author.
 
 ## Behaviour
 
 | Keys | Action |
 | --- | --- |
 | `ALT`+`TAB` | Open the switcher and select the previous window |
-| `ALT`+`TAB` again, `ALT` still held | Move one further down the list |
-| `ALT`+`SHIFT`+`TAB` | Move back up the list |
+| `ALT`+`TAB` again, `ALT` still held | Move one further along the bar |
+| `ALT`+`SHIFT`+`TAB` | Move back |
 | Release `ALT` | Switch to the highlighted window |
 | `ALT`+`ESCAPE` | Cancel without switching |
 
@@ -40,13 +48,13 @@ No other dependencies, and nothing to install beyond this repository.
 Add the plugin and enable it:
 
 ```bash
-omarchy plugin add https://github.com/Pablo-Merino/omarchy-altswitch.git --enable
+omarchy plugin add https://github.com/putueddy/omarchy-altswitch.git --enable
 ```
 
 Then load the keybindings from `~/.config/hypr/bindings.lua`:
 
 ```lua
-dofile(os.getenv("HOME") .. "/.config/omarchy/plugins/io.github.pablo-merino.altswitch/altswitch.lua")
+dofile(os.getenv("HOME") .. "/.config/omarchy/plugins/putueddy.altswitch/altswitch.lua")
 ```
 
 Apply it with `hyprctl reload`.
@@ -55,27 +63,41 @@ That line replaces Omarchy's four default `ALT`+`TAB` bindings (`cyclenext` and
 `bring_to_top`, in both directions). It unbinds them itself, so no other edit is
 needed.
 
+> Do **not** enable this fork at the same time as the original
+> `io.github.pablo-merino.altswitch`: both register the `altswitch` IPC target,
+> so only the first one loaded would respond. Disable or remove the other.
+
 ## Settings
 
-Application icons are shown by default. Hide them with:
+Icons are resolved from the window class through the desktop entries. When a
+window has no desktop entry, or resolves to the wrong icon, map it with
+`iconOverrides`. Each entry matches `appClass` exactly and, optionally, the
+window `title` exactly.
 
 ```bash
-omarchy-shell altswitch set showIcons false
+omarchy-shell altswitch set iconOverrides \
+  '[{"appClass":"org.quickshell","title":"Radio Atlas","icon":"~/.config/quickshell/radio-atlas/radio.svg"}]'
 ```
 
-| Command | Effect |
-| --- | --- |
-| `omarchy-shell altswitch set showIcons true` | Show application icons |
-| `omarchy-shell altswitch set showIcons false` | Hide application icons |
-
-Changes apply immediately and persist in the plugin's entry in
-`~/.config/omarchy/shell.json`.
-
-The equivalent manual setting is:
+`icon` accepts a theme icon name, an absolute path, a `~/` path, or a
+`file://` URL. The equivalent manual setting is the plugin's entry in
+`~/.config/omarchy/shell.json`:
 
 ```json
-{ "id": "io.github.pablo-merino.altswitch", "showIcons": true }
+{
+  "id": "putueddy.altswitch",
+  "iconOverrides": [
+    {
+      "appClass": "org.quickshell",
+      "title": "Radio Atlas",
+      "icon": "~/.config/quickshell/radio-atlas/radio.svg"
+    }
+  ]
+}
 ```
+
+A window that matches no override falls back to its desktop entry, then to the
+generic executable icon.
 
 ## Remove
 
@@ -83,7 +105,7 @@ Delete the `dofile` line from `~/.config/hypr/bindings.lua`, then:
 
 ```bash
 hyprctl reload
-omarchy plugin remove io.github.pablo-merino.altswitch
+omarchy plugin remove putueddy.altswitch
 ```
 
 Omarchy's default `ALT`+`TAB` bindings come back on the next reload.
@@ -97,9 +119,9 @@ the window list from `hl.get_windows()`, sorted by Hyprland's own
 `focus_history_id`, and drives the panel with `omarchy-shell altswitch
 show|select|hide`.
 
-`AltSwitch.qml` runs inside `omarchy-shell` and only draws the list. It takes no
-keyboard focus, so it cannot trap your keyboard, and it hides itself after ten
-seconds if an `ALT` release is ever missed.
+`AltSwitch.qml` runs inside `omarchy-shell` and only draws the icon bar and the
+selected title. It takes no keyboard focus, so it cannot trap your keyboard, and
+it hides itself after ten seconds if an `ALT` release is ever missed.
 
 Two Hyprland details are worth knowing if you plan to modify this:
 
@@ -113,10 +135,15 @@ Two Hyprland details are worth knowing if you plan to modify this:
 ## Known limitations
 
 - Keys that the switcher does not bind still reach the window underneath while
-  the list is open. Blocking them needs an exclusive keyboard grab, which risks
-  trapping the keyboard if a switch is ever left open.
+  the switcher is open. Blocking them needs an exclusive keyboard grab, which
+  risks trapping the keyboard if a switch is ever left open.
 - There are no window thumbnails.
+- The bar shows icons only; app names and workspace numbers are not drawn.
 
-## License
+## Credits & license
 
-[MIT](LICENSE)
+Original plugin: [Pablo Merino](https://github.com/Pablo-Merino) —
+`omarchy-altswitch`, MIT. This fork's appearance is adapted from a local
+Caelestia rework of the same plugin.
+
+[MIT](LICENSE) © 2026 Pablo Merino and putueddy.

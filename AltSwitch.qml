@@ -1,4 +1,5 @@
-// Windows-style ALT+TAB window list.
+// macOS-style ALT+TAB switcher: a horizontal bar of window icons with the
+// selected window's title beneath it.
 //
 // This is the display half only. All key handling and all state live in
 // altswitch.lua next to this file, loaded from the Hyprland config. It owns the
@@ -31,7 +32,7 @@ Item {
   property var windows: []
   property int selectedIndex: 0
 
-  readonly property string pluginId: String((manifest && manifest.id) || "io.github.pablo-merino.altswitch")
+  readonly property string pluginId: String((manifest && manifest.id) || "putueddy.altswitch")
   readonly property var pluginEntry: {
     const config = shell ? shell.shellConfig : null
     const plugins = config && Array.isArray(config.plugins) ? config.plugins : []
@@ -41,11 +42,43 @@ Item {
     }
     return ({})
   }
-  readonly property bool showIcons: pluginEntry.showIcons !== false
+  // Optional user-defined icon overrides. Windows whose class has no desktop
+  // entry (or the wrong icon) can be mapped to a specific icon here, from the
+  // plugin entry in shell.json:
+  //
+  //   "iconOverrides": [
+  //     { "appClass": "org.quickshell", "title": "Radio Atlas",
+  //       "icon": "~/.config/quickshell/radio-atlas/radio.svg" }
+  //   ]
+  //
+  // `appClass` is required and matched exactly. `title` is optional; when it is
+  // present the window title must match it exactly too. `icon` may be an icon
+  // name from the active theme, an absolute path, a ~/ path, or a file:// URL.
+  readonly property var iconOverrides: Array.isArray(pluginEntry.iconOverrides) ? pluginEntry.iconOverrides : []
 
-  readonly property int rowHeight: Math.max(Style.space(34), Style.font.body + Style.spacing.controlPaddingY * 2)
-  readonly property int cardWidth: Math.min(Style.space(560), panel.width - Style.gapsOut * 2)
-  readonly property int maxCardHeight: panel.height - Style.gapsOut * 2
+  readonly property var selectedWindow: root.windows.length > 0
+    ? root.windows[Math.max(0, Math.min(root.selectedIndex, root.windows.length - 1))]
+    : null
+  readonly property string selectedTitle: {
+    if (!root.selectedWindow) return ""
+    const title = String(root.selectedWindow.title || "").trim()
+    return title.length > 0 ? title : root.friendlyAppName(root.selectedWindow.appClass)
+  }
+
+  // macOS-style icon bar geometry (mirrors the Caelestia AltSwitch rework).
+  readonly property int iconSize: Style.space(48)
+  readonly property int cellSize: Style.space(64)
+  readonly property int cellGap: Style.space(6)
+  readonly property int cellRadius: Style.space(16)
+  readonly property int barPadding: Style.space(12)
+  readonly property int barHeight: cellSize + barPadding * 2
+  readonly property int barRadius: Style.space(22)
+  readonly property int titleGap: Style.space(16)
+  readonly property int maxBarWidth: Math.max(cellSize, panel.width - Style.space(48))
+  readonly property int desiredBarWidth: root.windows.length > 0
+    ? root.windows.length * cellSize + (root.windows.length - 1) * cellGap + barPadding * 2
+    : 0
+  readonly property int barWidth: Math.min(desiredBarWidth, maxBarWidth)
 
   function updatePluginSetting(name, value) {
     if (!shell || typeof shell.updateEntryInline !== "function") return false
@@ -58,14 +91,17 @@ Item {
   }
 
   function setPluginSetting(name, rawValue) {
-    if (name !== "showIcons") return "unknown setting: " + name
+    if (name !== "iconOverrides") return "unknown setting: " + name
 
-    const value = String(rawValue || "").trim().toLowerCase()
-    if (value !== "true" && value !== "false") return "showIcons must be true or false"
-
-    const enabled = value === "true"
-    if (!root.updatePluginSetting(name, enabled)) return "unavailable"
-    return String(enabled)
+    let parsed
+    try {
+      parsed = JSON.parse(String(rawValue || "[]"))
+    } catch (error) {
+      return "iconOverrides must be a JSON array"
+    }
+    if (!Array.isArray(parsed)) return "iconOverrides must be a JSON array"
+    if (!root.updatePluginSetting(name, parsed)) return "unavailable"
+    return "ok"
   }
 
   function friendlyAppName(appClass) {
@@ -83,8 +119,36 @@ Item {
     return name.replace(/(^|\s)\S/g, function(letter) { return letter.toUpperCase() })
   }
 
-  function appIcon(appClass) {
-    const raw = String(appClass || "").trim()
+  // Turn an override icon value into a QML image source. Theme icon names go
+  // through Quickshell.iconPath; paths and file:// URLs are used directly.
+  function resolveIconSource(icon) {
+    const value = String(icon || "").trim()
+    if (!value) return ""
+    if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0 || value.indexOf("qrc:/") === 0) return value
+    if (value.charAt(0) === "/") return Util.fileUrl(value)
+    if (value.indexOf("~/") === 0) return Util.fileUrl((Quickshell.env("HOME") || "") + value.slice(1))
+    return Quickshell.iconPath(value, true)
+  }
+
+  function overrideIcon(win) {
+    const appClass = String(win && win.appClass || "").trim()
+    const title = String(win && win.title || "").trim()
+    for (let i = 0; i < root.iconOverrides.length; i++) {
+      const override = root.iconOverrides[i]
+      if (!override || typeof override !== "object") continue
+      if (String(override.appClass || "").trim() !== appClass) continue
+      if (override.title !== undefined && String(override.title).trim() !== title) continue
+      const resolved = root.resolveIconSource(override.icon)
+      if (resolved) return resolved
+    }
+    return ""
+  }
+
+  function appIcon(win) {
+    const override = root.overrideIcon(win)
+    if (override) return override
+
+    const raw = String(win && win.appClass || "").trim()
     const entry = raw ? DesktopEntries.heuristicLookup(raw) : null
     const icon = entry ? String(entry.icon || "") : ""
 
@@ -179,32 +243,24 @@ Item {
       color: Color.menu.scrim
     }
 
-    BorderSurface {
-      id: card
+    // macOS-style icon bar: one cell per window, the selected one highlighted.
+    Rectangle {
+      id: bar
 
-      width: root.cardWidth
-      // BorderSurface exposes its padding as numbers rather than insetting its
-      // children, so the rows below carry the same insets by hand and the card
-      // is measured to match. Filling it outright leaves dead space under the
-      // last row.
-      height: Math.min(
-        root.maxCardHeight,
-        root.windows.length * root.rowHeight + card.contentTopInset + card.contentBottomInset
-      )
-      anchors.centerIn: parent
-      radius: Style.cornerRadius
+      width: root.barWidth
+      height: root.barHeight
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      radius: root.barRadius
       color: Color.menu.background
-      borderSpec: Border.surfaceSpec("menu", "border", Color.menu.border, Math.max(1, Style.space(2)))
-      padding: Style.spacing.panelPadding
 
       ListView {
         id: list
 
         anchors.fill: parent
-        anchors.topMargin: card.contentTopInset
-        anchors.bottomMargin: card.contentBottomInset
-        anchors.leftMargin: card.contentLeftInset
-        anchors.rightMargin: card.contentRightInset
+        anchors.margins: root.barPadding
+        orientation: ListView.Horizontal
+        spacing: root.cellGap
         clip: true
         interactive: false
         model: root.windows
@@ -212,68 +268,51 @@ Item {
         highlightMoveDuration: 0
         // Keep the cursor on screen when there are more windows than fit.
         preferredHighlightBegin: 0
-        preferredHighlightEnd: height
+        preferredHighlightEnd: width
         highlightRangeMode: ListView.ApplyRange
 
-        delegate: Rectangle {
+        delegate: Item {
           required property int index
           required property var modelData
 
-          width: list.width
-          height: root.rowHeight
-          radius: Style.cornerRadius
-          color: index === root.selectedIndex ? Color.menu.selectedBackground : "transparent"
+          width: root.cellSize
+          height: root.cellSize
 
-          RowLayout {
+          Rectangle {
             anchors.fill: parent
-            anchors.leftMargin: Style.spacing.controlPaddingX
-            anchors.rightMargin: Style.spacing.controlPaddingX
-            spacing: Style.spacing.md
+            radius: root.cellRadius
+            color: index === root.selectedIndex ? Util.alpha(Color.foreground, 0.18) : "transparent"
+          }
 
-            // Workspace number, so a switch across workspaces is legible.
-            Text {
-              Layout.preferredWidth: Style.space(24)
-              horizontalAlignment: Text.AlignRight
-              text: modelData.workspace
-              color: Color.menu.text
-              opacity: 0.5
-              font.family: Style.font.menuFamily
-              font.pixelSize: Style.font.body
-            }
-
-            Image {
-              visible: root.showIcons
-              Layout.preferredWidth: Style.space(24)
-              Layout.preferredHeight: Style.space(24)
-              fillMode: Image.PreserveAspectFit
-              sourceSize.width: width * Screen.devicePixelRatio
-              sourceSize.height: height * Screen.devicePixelRatio
-              source: root.appIcon(modelData.appClass)
-              asynchronous: true
-            }
-
-            Text {
-              Layout.preferredWidth: Style.space(88)
-              Layout.maximumWidth: Style.space(88)
-              elide: Text.ElideRight
-              text: root.friendlyAppName(modelData.appClass)
-              color: index === root.selectedIndex ? Color.menu.selectedText : Color.menu.text
-              opacity: 0.7
-              font.family: Style.font.menuFamily
-              font.pixelSize: Style.font.body
-            }
-
-            Text {
-              Layout.fillWidth: true
-              elide: Text.ElideRight
-              text: modelData.title
-              color: index === root.selectedIndex ? Color.menu.selectedText : Color.menu.text
-              font.family: Style.font.menuFamily
-              font.pixelSize: Style.font.body
-            }
+          Image {
+            anchors.centerIn: parent
+            width: root.iconSize
+            height: root.iconSize
+            source: root.appIcon(modelData)
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: width * Screen.devicePixelRatio
+            sourceSize.height: height * Screen.devicePixelRatio
+            asynchronous: true
+            smooth: true
           }
         }
       }
+    }
+
+    // Selected window's title, centred under the bar.
+    Text {
+      id: titleLabel
+
+      anchors.horizontalCenter: parent.horizontalCenter
+      y: Math.round((parent.height + root.barHeight) / 2) + root.titleGap
+      width: Math.min(implicitWidth, parent.width - Style.space(48))
+      visible: root.selectedTitle.length > 0
+      text: root.selectedTitle
+      color: Util.alpha(Color.menu.text, 0.9)
+      horizontalAlignment: Text.AlignHCenter
+      elide: Text.ElideRight
+      font.family: Style.font.menuFamily
+      font.pixelSize: Style.font.title
     }
   }
 }

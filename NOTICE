@@ -1,0 +1,27 @@
+Alt-tab switcher (macOS-style) — fork notice
+
+This is a modified fork of "Alt-tab switcher" by Pablo Merino.
+
+  Upstream:   https://github.com/Pablo-Merino/omarchy-altswitch
+  Base:       1.0.0 at commit 8f54d684c89d66ecf51e6e5a9c5c574758de79be
+              (2026-08-30)
+  Original:   Copyright (c) 2026 Pablo Merino
+  Fork:       Copyright (c) 2026 putueddy (modifications)
+  License:    MIT — see LICENSE
+
+The original plugin is licensed under the MIT License and is used and modified
+here under those terms. All original source, comments, and behavior remain the
+work of the original author; this fork only adds the changes listed below.
+
+Changes in this fork
+--------------------
+
+- Replaced the list-card appearance with a macOS-style horizontal bar of
+  window icons. The selected window's title is drawn centred beneath the bar.
+- Generalized icon resolution with a user-configurable `iconOverrides` list
+  (match by window class, optionally by title) instead of hard-coding a single
+  application's icon.
+- Removed the `showIcons` setting, which is meaningless for an icon-only bar.
+
+See CHANGELOG.md for details. This project is not affiliated with or endorsed
+by the original author.
