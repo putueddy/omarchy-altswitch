@@ -1,27 +1,32 @@
-# Alt-tab switcher (macOS-style)
+# Alt-tab switcher (macOS-style bar)
 
-A macOS-style `ALT`+`TAB` switcher for [Omarchy](https://omarchy.org/). Cycles
-every window on every workspace, ordered by most recently used, and shows a
-horizontal bar of window icons with the selected window's title beneath it.
+An `ALT`+`TAB` switcher for [Omarchy](https://omarchy.org/) with two
+appearances. Cycles every window on every workspace, ordered by most recently
+used.
 
-Hold `ALT`, tap `TAB` to move along the bar, release `ALT` to jump to the
-highlighted window.
+- **`list`** (default) — the original list card: workspace number, icon, app
+  name, and window title per row. This is exactly the upstream appearance.
+- **`bar`** — a macOS-style horizontal bar of window icons with the selected
+  window's title beneath it.
 
-![Preview](preview.png)
+Hold `ALT`, tap `TAB` to move through the list or bar, release `ALT` to jump to
+the highlighted window.
+
+![Bar style (opt-in)](preview.png)
 
 > **This is a fork.** It is based on Pablo Merino's
 > [omarchy-altswitch](https://github.com/Pablo-Merino/omarchy-altswitch) 1.0.0
-> (MIT). The key handling, state machine, and IPC are unchanged; this fork
-> replaces the list-card appearance with an icon bar and adds a configurable
-> icon override. See [NOTICE](NOTICE) and [CHANGELOG](CHANGELOG.md). Not
-> affiliated with or endorsed by the original author.
+> (MIT). Key handling, state, and IPC are unchanged; this fork adds an opt-in
+> icon-bar appearance and a configurable icon override. See [NOTICE](NOTICE) and
+> [CHANGELOG](CHANGELOG.md). Not affiliated with or endorsed by the original
+> author.
 
 ## Behaviour
 
 | Keys | Action |
 | --- | --- |
 | `ALT`+`TAB` | Open the switcher and select the previous window |
-| `ALT`+`TAB` again, `ALT` still held | Move one further along the bar |
+| `ALT`+`TAB` again, `ALT` still held | Move one further along the list |
 | `ALT`+`SHIFT`+`TAB` | Move back |
 | Release `ALT` | Switch to the highlighted window |
 | `ALT`+`ESCAPE` | Cancel without switching |
@@ -65,14 +70,31 @@ needed.
 
 > Do **not** enable this fork at the same time as the original
 > `io.github.pablo-merino.altswitch`: both register the `altswitch` IPC target,
-> so only the first one loaded would respond. Disable or remove the other.
+> so only the first one loaded would respond.
 
 ## Settings
 
+### `style`
+
+Choose the appearance. Defaults to `list`.
+
+```bash
+omarchy-shell altswitch set style bar    # macOS-style icon bar
+omarchy-shell altswitch set style list   # original list card
+```
+
+The equivalent manual setting is the plugin's entry in
+`~/.config/omarchy/shell.json`:
+
+```json
+{ "id": "putueddy.altswitch", "style": "bar" }
+```
+
+### `iconOverrides`
+
 Icons are resolved from the window class through the desktop entries. When a
-window has no desktop entry, or resolves to the wrong icon, map it with
-`iconOverrides`. Each entry matches `appClass` exactly and, optionally, the
-window `title` exactly.
+window has no desktop entry, or resolves to the wrong icon, map it here. Each
+entry matches `appClass` exactly and, optionally, the window `title` exactly.
 
 ```bash
 omarchy-shell altswitch set iconOverrides \
@@ -80,8 +102,7 @@ omarchy-shell altswitch set iconOverrides \
 ```
 
 `icon` accepts a theme icon name, an absolute path, a `~/` path, or a
-`file://` URL. The equivalent manual setting is the plugin's entry in
-`~/.config/omarchy/shell.json`:
+`file://` URL.
 
 ```json
 {
@@ -98,6 +119,16 @@ omarchy-shell altswitch set iconOverrides \
 
 A window that matches no override falls back to its desktop entry, then to the
 generic executable icon.
+
+### `showIcons`
+
+In `list` style, hide the per-row application icons:
+
+```bash
+omarchy-shell altswitch set showIcons false
+```
+
+`showIcons` has no effect in `bar` style, which is icon-only.
 
 ## Remove
 
@@ -119,9 +150,9 @@ the window list from `hl.get_windows()`, sorted by Hyprland's own
 `focus_history_id`, and drives the panel with `omarchy-shell altswitch
 show|select|hide`.
 
-`AltSwitch.qml` runs inside `omarchy-shell` and only draws the icon bar and the
-selected title. It takes no keyboard focus, so it cannot trap your keyboard, and
-it hides itself after ten seconds if an `ALT` release is ever missed.
+`AltSwitch.qml` runs inside `omarchy-shell` and draws the panel in the selected
+style. It takes no keyboard focus, so it cannot trap your keyboard, and it hides
+itself after ten seconds if an `ALT` release is ever missed.
 
 Two Hyprland details are worth knowing if you plan to modify this:
 
@@ -138,12 +169,13 @@ Two Hyprland details are worth knowing if you plan to modify this:
   the switcher is open. Blocking them needs an exclusive keyboard grab, which
   risks trapping the keyboard if a switch is ever left open.
 - There are no window thumbnails.
-- The bar shows icons only; app names and workspace numbers are not drawn.
+- The `bar` style shows icons only; app names and workspace numbers are not
+  drawn.
 
 ## Credits & license
 
 Original plugin: [Pablo Merino](https://github.com/Pablo-Merino) —
-`omarchy-altswitch`, MIT. This fork's appearance is adapted from a local
-Caelestia rework of the same plugin.
+`omarchy-altswitch`, MIT. The `bar` style is adapted from a local Caelestia
+rework of the same plugin.
 
 [MIT](LICENSE) © 2026 Pablo Merino and putueddy.

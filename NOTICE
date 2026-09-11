@@ -1,4 +1,4 @@
-Alt-tab switcher (macOS-style) — fork notice
+Alt-tab switcher (macOS-style bar) — fork notice
 
 This is a modified fork of "Alt-tab switcher" by Pablo Merino.
 
@@ -16,12 +16,13 @@ work of the original author; this fork only adds the changes listed below.
 Changes in this fork
 --------------------
 
-- Replaced the list-card appearance with a macOS-style horizontal bar of
-  window icons. The selected window's title is drawn centred beneath the bar.
+- Added an opt-in macOS-style appearance: a horizontal bar of window icons with
+  the selected window's title beneath it. Selected with `"style": "bar"`. The
+  default remains `"list"`, the original list card, so behavior is unchanged
+  unless the user opts in.
 - Generalized icon resolution with a user-configurable `iconOverrides` list
   (match by window class, optionally by title) instead of hard-coding a single
   application's icon.
-- Removed the `showIcons` setting, which is meaningless for an icon-only bar.
 
-See CHANGELOG.md for details. This project is not affiliated with or endorsed
-by the original author.
+No original behavior is removed. See CHANGELOG.md for details. This project is
+not affiliated with or endorsed by the original author.

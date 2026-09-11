@@ -1,5 +1,7 @@
-// macOS-style ALT+TAB switcher: a horizontal bar of window icons with the
-// selected window's title beneath it.
+// ALT+TAB switcher. Two appearances:
+//   * "list" (default) - the original list card (upstream appearance).
+//   * "bar"            - a macOS-style horizontal bar of window icons with the
+//                        selected window's title beneath it.
 //
 // This is the display half only. All key handling and all state live in
 // altswitch.lua next to this file, loaded from the Hyprland config. It owns the
@@ -42,6 +44,17 @@ Item {
     }
     return ({})
   }
+
+  // Appearance. "list" is the original list card; "bar" is the macOS-style
+  // icon bar. Defaults to "list" so the plugin matches upstream unless the user
+  // opts in with:
+  //
+  //   "style": "bar"
+  readonly property string style: {
+    const value = String(pluginEntry.style || "list").trim().toLowerCase()
+    return value === "bar" ? "bar" : "list"
+  }
+
   // Optional user-defined icon overrides. Windows whose class has no desktop
   // entry (or the wrong icon) can be mapped to a specific icon here, from the
   // plugin entry in shell.json:
@@ -56,6 +69,14 @@ Item {
   // name from the active theme, an absolute path, a ~/ path, or a file:// URL.
   readonly property var iconOverrides: Array.isArray(pluginEntry.iconOverrides) ? pluginEntry.iconOverrides : []
 
+  // List style: draw the per-row application icon (upstream `showIcons`).
+  readonly property bool showIcons: pluginEntry.showIcons !== false
+
+  // List style geometry (unchanged from upstream).
+  readonly property int rowHeight: Math.max(Style.space(34), Style.font.body + Style.spacing.controlPaddingY * 2)
+  readonly property int cardWidth: Math.min(Style.space(560), panel.width - Style.gapsOut * 2)
+  readonly property int maxCardHeight: panel.height - Style.gapsOut * 2
+
   readonly property var selectedWindow: root.windows.length > 0
     ? root.windows[Math.max(0, Math.min(root.selectedIndex, root.windows.length - 1))]
     : null
@@ -65,7 +86,7 @@ Item {
     return title.length > 0 ? title : root.friendlyAppName(root.selectedWindow.appClass)
   }
 
-  // macOS-style icon bar geometry (mirrors the Caelestia AltSwitch rework).
+  // Bar style geometry (mirrors the Caelestia AltSwitch rework).
   readonly property int iconSize: Style.space(48)
   readonly property int cellSize: Style.space(64)
   readonly property int cellGap: Style.space(6)
@@ -91,17 +112,34 @@ Item {
   }
 
   function setPluginSetting(name, rawValue) {
-    if (name !== "iconOverrides") return "unknown setting: " + name
-
-    let parsed
-    try {
-      parsed = JSON.parse(String(rawValue || "[]"))
-    } catch (error) {
-      return "iconOverrides must be a JSON array"
+    if (name === "style") {
+      const style = String(rawValue || "").trim().toLowerCase()
+      if (style !== "list" && style !== "bar") return "style must be list or bar"
+      if (!root.updatePluginSetting(name, style)) return "unavailable"
+      return style
     }
-    if (!Array.isArray(parsed)) return "iconOverrides must be a JSON array"
-    if (!root.updatePluginSetting(name, parsed)) return "unavailable"
-    return "ok"
+
+    if (name === "showIcons") {
+      const value = String(rawValue || "").trim().toLowerCase()
+      if (value !== "true" && value !== "false") return "showIcons must be true or false"
+      const enabled = value === "true"
+      if (!root.updatePluginSetting(name, enabled)) return "unavailable"
+      return String(enabled)
+    }
+
+    if (name === "iconOverrides") {
+      let parsed
+      try {
+        parsed = JSON.parse(String(rawValue || "[]"))
+      } catch (error) {
+        return "iconOverrides must be a JSON array"
+      }
+      if (!Array.isArray(parsed)) return "iconOverrides must be a JSON array"
+      if (!root.updatePluginSetting(name, parsed)) return "unavailable"
+      return "ok"
+    }
+
+    return "unknown setting: " + name
   }
 
   function friendlyAppName(appClass) {
@@ -243,10 +281,111 @@ Item {
       color: Color.menu.scrim
     }
 
-    // macOS-style icon bar: one cell per window, the selected one highlighted.
+    // List style (default): the original list card. Workspace number, icon,
+    // app name, and window title per row.
+    BorderSurface {
+      id: card
+
+      visible: root.style === "list"
+      width: root.cardWidth
+      // BorderSurface exposes its padding as numbers rather than insetting its
+      // children, so the rows below carry the same insets by hand and the card
+      // is measured to match. Filling it outright leaves dead space under the
+      // last row.
+      height: Math.min(
+        root.maxCardHeight,
+        root.windows.length * root.rowHeight + card.contentTopInset + card.contentBottomInset
+      )
+      anchors.centerIn: parent
+      radius: Style.cornerRadius
+      color: Color.menu.background
+      borderSpec: Border.surfaceSpec("menu", "border", Color.menu.border, Math.max(1, Style.space(2)))
+      padding: Style.spacing.panelPadding
+
+      ListView {
+        id: list
+
+        anchors.fill: parent
+        anchors.topMargin: card.contentTopInset
+        anchors.bottomMargin: card.contentBottomInset
+        anchors.leftMargin: card.contentLeftInset
+        anchors.rightMargin: card.contentRightInset
+        clip: true
+        interactive: false
+        model: root.windows
+        currentIndex: root.selectedIndex
+        highlightMoveDuration: 0
+        // Keep the cursor on screen when there are more windows than fit.
+        preferredHighlightBegin: 0
+        preferredHighlightEnd: height
+        highlightRangeMode: ListView.ApplyRange
+
+        delegate: Rectangle {
+          required property int index
+          required property var modelData
+
+          width: list.width
+          height: root.rowHeight
+          radius: Style.cornerRadius
+          color: index === root.selectedIndex ? Color.menu.selectedBackground : "transparent"
+
+          RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: Style.spacing.controlPaddingX
+            anchors.rightMargin: Style.spacing.controlPaddingX
+            spacing: Style.spacing.md
+
+            // Workspace number, so a switch across workspaces is legible.
+            Text {
+              Layout.preferredWidth: Style.space(24)
+              horizontalAlignment: Text.AlignRight
+              text: modelData.workspace
+              color: Color.menu.text
+              opacity: 0.5
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
+            }
+
+            Image {
+              visible: root.showIcons
+              Layout.preferredWidth: Style.space(24)
+              Layout.preferredHeight: Style.space(24)
+              fillMode: Image.PreserveAspectFit
+              sourceSize.width: width * Screen.devicePixelRatio
+              sourceSize.height: height * Screen.devicePixelRatio
+              source: root.appIcon(modelData)
+              asynchronous: true
+            }
+
+            Text {
+              Layout.preferredWidth: Style.space(88)
+              Layout.maximumWidth: Style.space(88)
+              elide: Text.ElideRight
+              text: root.friendlyAppName(modelData.appClass)
+              color: index === root.selectedIndex ? Color.menu.selectedText : Color.menu.text
+              opacity: 0.7
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
+            }
+
+            Text {
+              Layout.fillWidth: true
+              elide: Text.ElideRight
+              text: modelData.title
+              color: index === root.selectedIndex ? Color.menu.selectedText : Color.menu.text
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
+            }
+          }
+        }
+      }
+    }
+
+    // Bar style: one cell per window, the selected one highlighted.
     Rectangle {
       id: bar
 
+      visible: root.style === "bar"
       width: root.barWidth
       height: root.barHeight
       anchors.horizontalCenter: parent.horizontalCenter
@@ -255,7 +394,7 @@ Item {
       color: Color.menu.background
 
       ListView {
-        id: list
+        id: barList
 
         anchors.fill: parent
         anchors.margins: root.barPadding
@@ -299,14 +438,14 @@ Item {
       }
     }
 
-    // Selected window's title, centred under the bar.
+    // Bar style: selected window's title, centred under the bar.
     Text {
       id: titleLabel
 
+      visible: root.style === "bar" && root.selectedTitle.length > 0
       anchors.horizontalCenter: parent.horizontalCenter
       y: Math.round((parent.height + root.barHeight) / 2) + root.titleGap
       width: Math.min(implicitWidth, parent.width - Style.space(48))
-      visible: root.selectedTitle.length > 0
       text: root.selectedTitle
       color: Util.alpha(Color.menu.text, 0.9)
       horizontalAlignment: Text.AlignHCenter

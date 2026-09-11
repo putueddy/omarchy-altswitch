@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "id": "putueddy.altswitch",
-  "name": "Alt-tab switcher (macOS-style)",
+  "name": "Alt-tab switcher (macOS-style bar)",
   "version": "1.1.0",
   "author": "putueddy",
   "license": "MIT",
-  "description": "macOS-style ALT+TAB window switcher for Omarchy: a horizontal bar of window icons with the selected window's title beneath it, ordered by most recently used.",
+  "description": "ALT+TAB window switcher for Omarchy, ordered by most recently used. Keeps the original list card as the default and adds an opt-in macOS-style icon bar plus configurable icon overrides.",
   "homepage": "https://github.com/putueddy/omarchy-altswitch",
   "repository": "https://github.com/putueddy/omarchy-altswitch",
   "keywords": [
