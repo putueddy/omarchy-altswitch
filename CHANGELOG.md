@@ -51,6 +51,14 @@ Nothing from upstream is removed; the new appearance is opt-in.
 - Icons without an override still resolve exactly as before, through the window
   class and the desktop entries.
 
+### Fixed
+
+- Read the plugin's own entry straight from `~/.config/omarchy/shell.json`
+  (via a watched `FileView`) instead of `shell.shellConfig`. Third-party
+  plugins receive a capability-scoped shell facade that does not expose the
+  shell config, so the old lookup always returned empty: settings were ignored
+  and any inline setting was dropped as soon as another one was written.
+
 ### Unchanged
 
 - `altswitch.lua` (state machine, key handling, IPC) is untouched.

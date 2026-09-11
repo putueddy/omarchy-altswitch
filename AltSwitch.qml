@@ -35,14 +35,34 @@ Item {
   property int selectedIndex: 0
 
   readonly property string pluginId: String((manifest && manifest.id) || "putueddy.altswitch")
+
+  // Third-party plugins get a capability-scoped shell facade that does not
+  // expose the shell config, so read our own entry from shell.json directly.
+  // The shell persists `omarchy-shell altswitch set ...` there, and the file is
+  // watched, so changes apply without a restart.
+  property string shellConfigText: ""
   readonly property var pluginEntry: {
-    const config = shell ? shell.shellConfig : null
-    const plugins = config && Array.isArray(config.plugins) ? config.plugins : []
-    for (let i = 0; i < plugins.length; i++) {
-      const entry = plugins[i]
-      if (entry && entry.id === root.pluginId) return entry
+    try {
+      const config = JSON.parse(root.shellConfigText || "{}")
+      const plugins = config && Array.isArray(config.plugins) ? config.plugins : []
+      for (let i = 0; i < plugins.length; i++) {
+        const entry = plugins[i]
+        if (entry && entry.id === root.pluginId) return entry
+      }
+    } catch (error) {
+      return ({})
     }
     return ({})
+  }
+
+  FileView {
+    id: shellConfigFile
+
+    path: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/omarchy/shell.json"
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.shellConfigText = text()
+    onFileChanged: reload()
   }
 
   // Appearance. "list" is the original list card; "bar" is the macOS-style
@@ -104,8 +124,17 @@ Item {
   function updatePluginSetting(name, value) {
     if (!shell || typeof shell.updateEntryInline !== "function") return false
 
+    // Round-trip through JSON so nested values become plain JS values. Iterating
+    // the plugin entry directly can miss keys, and the shell replaces the whole
+    // entry with the object we pass back, so a missed key would be dropped.
+    let current
+    try {
+      current = JSON.parse(JSON.stringify(root.pluginEntry || {}))
+    } catch (error) {
+      current = {}
+    }
     const next = ({})
-    for (const key in root.pluginEntry) if (key !== "id") next[key] = root.pluginEntry[key]
+    for (const key in current) if (key !== "id") next[key] = current[key]
     next[name] = value
     shell.updateEntryInline(root.pluginId, next)
     return true
