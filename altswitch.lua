@@ -1,6 +1,7 @@
 -- Windows-style ALT+TAB for Hyprland: cycle every window on every workspace,
 -- most recently used first. Hold ALT, tap TAB to move down the list, release
--- ALT to jump to the highlighted window. ALT+SHIFT+TAB moves back up, ESCAPE
+-- ALT to jump to the highlighted window. ALT+SHIFT+TAB moves back up. While
+-- switching, RIGHT/LEFT moves forward/backward even with SHIFT held; ESCAPE
 -- cancels.
 --
 -- Load it from ~/.config/hypr/bindings.lua:
@@ -135,6 +136,29 @@ hl.unbind("ALT + SHIFT + TAB")
 hl.bind("ALT + TAB", function() altswitch_step(1) end, { description = "Switch window" })
 hl.bind("ALT + SHIFT + TAB", function() altswitch_step(-1) end, { description = "Switch window (reverse)" })
 hl.bind("ALT + ESCAPE", altswitch_teardown, { non_consuming = true, description = "Cancel window switch" })
+
+-- Arrows only navigate an existing switch. Auto-consuming binds pass the key
+-- through to the focused application when no switch is active (e.g. browser
+-- Back/Forward). SHIFT does not reverse the arrow's physical direction.
+local function altswitch_arrow(delta)
+  if not altswitch.active then
+    return { ok = false }
+  end
+
+  altswitch_step(delta)
+  return { ok = true }
+end
+
+for _, modifiers in ipairs({ "ALT", "ALT + SHIFT" }) do
+  hl.bind(modifiers .. " + RIGHT", function() return altswitch_arrow(1) end, {
+    auto_consuming = true,
+    description = "Select next window in switcher",
+  })
+  hl.bind(modifiers .. " + LEFT", function() return altswitch_arrow(-1) end, {
+    auto_consuming = true,
+    description = "Select previous window in switcher",
+  })
+end
 
 -- Committing on ALT release cannot be a keybind. A release bind on a modifier
 -- only fires when that modifier is tapped on its own; pressing TAB in between

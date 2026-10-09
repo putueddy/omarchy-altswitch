@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Move the switcher selection with `ALT`+`RIGHT` / `ALT`+`LEFT`, including
+  while `SHIFT` is held. Right always moves forward and left moves backward,
+  wrapping at either end. When the switcher is closed, these keys pass through
+  to the focused application.
+
 ## 1.1.0 — 2026-09-11
 
 Fork additions, based on upstream 1.0.0 (commit `8f54d68`, 2026-08-30).

@@ -16,6 +16,8 @@ work of the original author; this fork only adds the changes listed below.
 Changes in this fork
 --------------------
 
+- Added right/left arrow navigation while the switcher is open, with or without
+  SHIFT held. Arrow shortcuts pass through to applications when it is closed.
 - Added an opt-in macOS-style appearance: a horizontal bar of window icons with
   the selected window's title beneath it. Selected with `"style": "bar"`. The
   default remains `"list"`, the original list card, so behavior is unchanged

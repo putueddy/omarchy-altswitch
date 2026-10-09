@@ -16,8 +16,8 @@ the highlighted window.
 
 > **This is a fork.** It is based on Pablo Merino's
 > [omarchy-altswitch](https://github.com/Pablo-Merino/omarchy-altswitch) 1.0.0
-> (MIT). Key handling, state, and IPC are unchanged; this fork adds an opt-in
-> icon-bar appearance and a configurable icon override. See [NOTICE](NOTICE) and
+> (MIT). This fork adds an opt-in icon-bar appearance, configurable icon
+> overrides, and arrow navigation while switching. See [NOTICE](NOTICE) and
 > [CHANGELOG](CHANGELOG.md). Not affiliated with or endorsed by the original
 > author.
 
@@ -28,8 +28,12 @@ the highlighted window.
 | `ALT`+`TAB` | Open the switcher and select the previous window |
 | `ALT`+`TAB` again, `ALT` still held | Move one further along the list |
 | `ALT`+`SHIFT`+`TAB` | Move back |
+| `RIGHT` / `LEFT`, `ALT` still held | Move forward / back while the switcher is open; also works with `SHIFT` held |
 | Release `ALT` | Switch to the highlighted window |
 | `ALT`+`ESCAPE` | Cancel without switching |
+
+Arrow shortcuts pass through to the focused application when the switcher is
+closed. While switching, arrows wrap around at either end of the window list.
 
 Two things make this behave like Windows rather than like Hyprland's
 `cyclenext`:
